@@ -6,10 +6,28 @@ import jenkinsapi
 from jenkinsapi.jenkins import Jenkins
 import jenkins
 import string
+import socket
+import fcntl
+import struct
+
+def get_ip_address(ifname):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+      address= socket.inet_ntoa(fcntl.ioctl(
+        s.fileno(),
+        0x8915,  # SIOCGIFADDR
+        struct.pack('256s', ifname[:15])
+      )[20:24])
+    except:
+      address=""
+    return address
 
 def Get_Status( BuildName ):
-  output= CurrentBuild[:16]
-  lastBuild=J[BuildName].get_last_completed_build()
+  output= BuildName[:16]
+  try:
+    lastBuild=J[BuildName].get_last_completed_build()
+  except:
+    return output
   Status=lastBuild.get_status()
   output+="\n"+Status + " "
   hasResults=lastBuild.has_resultset()
@@ -19,17 +37,20 @@ def Get_Status( BuildName ):
   totalTest=0
   skipTests=0
   if hasResults:
-     print "Has results"
-     failures=info['actions'][15]['failCount']
-     totalTest=info['actions'][15]['totalCount']
-     skipTests=info['actions'][15]['skipCount']
+     try:
+       print "Has results"
+       failures=info['actions'][15]['failCount']
+       totalTest=info['actions'][15]['totalCount']
+       skipTests=info['actions'][15]['skipCount']
+     except:
+       print "Error Getting Test Results"
   output+='%d/%d' % (failures,totalTest)
   return output
 
 import Adafruit_CharLCD as LCD
 
 
-# Initialize the LCD using the pins 
+# Initialize the LCD using the pins
 lcd = LCD.Adafruit_CharLCDPlate()
 
 # create some custom characters
@@ -41,8 +62,15 @@ lcd.create_char(5, [8, 12, 10, 9, 10, 12, 8, 0])
 lcd.create_char(6, [2, 6, 10, 18, 10, 6, 2, 0])
 lcd.create_char(7, [31, 17, 21, 21, 21, 21, 17, 31])
 
-# Turning on BackLight, and Displaying Connecting Message
+
+
+# Turning on BackLight, and Displaying IP Address
 lcd.set_color(1.0, 0.0, 0.0)
+lcd.clear()
+IP_Address=get_ip_address('eth0')+"\n"+get_ip_address('wlan0')
+lcd.message(IP_Address)
+time.sleep(3.0)
+
 lcd.clear()
 lcd.message('Connecting...')
 
@@ -64,6 +92,7 @@ for buildName in J.keys():
 CurrentBuildNum=5
 numBuilds=len(MainBuilds)
 lcd.clear()
+print MainBuilds[CurrentBuildNum]
 lcd.message(Get_Status(MainBuilds[CurrentBuildNum]))
 
 
